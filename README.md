@@ -1,4 +1,4 @@
-*Intro to Machine Learning*
+****Intro to Machine Learning****
 
 **Description**
 	- In this repository, I will be creating my own code to practice and showacse my understanding of basic machine learning algorithms.
