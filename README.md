@@ -1,9 +1,9 @@
-***Intro to Machine Learning***
+# Intro to Machine Learning
 
-**Description**
-	- In this repository, I will be creating my own code to practice and showacse my understanding of basic machine learning algorithms.
-	- I will be using CUDA C and C++ throughout my projects to display my knowledge of parallelism in computing
+## Overview
+In this repository, I will implement and experiment with fundamental machine learning algorithms. My goal is to deepen my understanding of these techniques while showcasing my skills in parallel computing using CUDA C and C++.
 
+## Projects
 
-**K-Nearest Neighbors**
-	- This is the first classifier I will be implementing
+### K-Nearest Neighbors (KNN)
+The first project in this repository is an implementation of the K-Nearest Neighbors classifier. This project demonstrates the core principles of supervised learning and provides an opportunity to integrate parallel computing concepts for enhanced performance.
