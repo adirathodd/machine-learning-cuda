@@ -4,7 +4,7 @@
 
 int numRows, numCols;
 
-float *loadCSV(char *filename){
+float *loadCSV(const char *filename){
    FILE *file = fopen(filename, "r");
 
    if(!file) {

@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-float *loadCSV(char *filename);
+float *loadCSV(const char *filename);
 
 extern int numRows;
 extern int numCols;

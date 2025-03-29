@@ -4,9 +4,10 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <time.h>
+#include <knn.h>
 
 void shuffle(int *array, int n) {
-    srand(time(NULL));
+    srand(1);
     for (int i = n - 1; i > 0; i--) {
         int j = rand() % (i + 1);
         int temp = array[i];
@@ -15,51 +16,13 @@ void shuffle(int *array, int n) {
     }
 }
 
-void printData(float *X_train, float *X_test, float *y_train, float *y_test, int numFeatures, int trainRows, int testRows){
-	// Print X_train
-	printf("X_train:\n");
-	for (int i = 0; i < trainRows; i++) {
-	    printf("Row %d: ", i);
-	    for (int j = 0; j < numFeatures; j++) {
-		printf("%f ", X_train[i * numFeatures + j]);
-	    }
-	    printf("\n");
-	}
-
-	// Print y_train
-	printf("\ny_train:\n");
-	for (int i = 0; i < trainRows; i++) {
-	    printf("%f ", y_train[i]);
-	}
-	printf("\n");
-
-	// Print X_test
-	printf("\nX_test:\n");
-	for (int i = 0; i < testRows; i++) {
-	    printf("Row %d: ", i);
-	    for (int j = 0; j < numFeatures; j++) {
-		printf("%f ", X_test[i * numFeatures + j]);
-	    }
-	    printf("\n");
-	}
-
-	// Print y_test
-	printf("\ny_test:\n");
-	for (int i = 0; i < testRows; i++) {
-	    printf("%f ", y_test[i]);
-	}
-	printf("\n");
-
-}
-
 int main(int argc, char *argv[]){	
-	if(argc != 2){
-		printf("Usage - %s <filepath>\n", argv[0]);
+	if(argc != 1){
+		printf("Usage - %s\n", argv[0]);
 		return -1;
 	}
 
-	float *data = loadCSV(argv[1]);	
-	
+	float *data = loadCSV("/home/adirathodd/Documents/intro-to-ml/knn/data/iris.data");	   
 	int trainRows = numRows * 0.8, testRows = numRows - trainRows;
 	
 	int indices[numRows];
@@ -85,6 +48,28 @@ int main(int argc, char *argv[]){
                 memcpy(&y_test[i-trainRows], &data[rowIndex * numCols + 4], sizeof(float));
         }
 	
-	printData(X_train, X_test, y_train, y_test, numCols - 1, trainRows, testRows);
+	//printData(X_train, X_test, y_train, y_test, numCols - 1, trainRows, testRows);
+	
+	for(int k = 1; k < 10; k++){
+		knn model(trainRows, numCols - 1, k);
+		model.fit(X_train, y_train);
+		float correct = 0.0;
+
+		for(int i = 0; i < testRows; i++) {
+			float res = model.predict(&X_test[i * (numCols - 1)]);
+			if(res == y_test[i]){
+				correct++;
+			}
+		}
+
+		printf("K-%d-NN Model Accuracy = %.2f%%\n", k, (correct / testRows) * 100);
+	}
+
+	free(data);
+	free(X_train);
+	free(y_train);
+	free(X_test);
+	free(y_test);
+
 	return 0;
 }
