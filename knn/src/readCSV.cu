@@ -47,12 +47,12 @@ float *loadCSV(const char *filename){
 	char *token = strtok(line, ",");
 	while(token != NULL){
 		if(col == 4){
-			float class;
-			if(strcmp("Iris-setosa\n", token) == 0) class = 0;
-			else if(strcmp(token, "Iris-versicolor\n") == 0) class = 1;
-			else class = 2;
+			float label;
+			if(strcmp("Iris-setosa\n", token) == 0) label = 0;
+			else if(strcmp(token, "Iris-versicolor\n") == 0) label = 1;
+			else label = 2;
 
-			data[row * cols + col] = class;
+			data[row * cols + col] = label;
 			break;
 		}
 		
