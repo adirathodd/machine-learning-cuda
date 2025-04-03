@@ -11,17 +11,16 @@ using namespace std;
 
 class linearRegression {
     private:
-        float p;
+        float p, bias;
         float *weights;
+        vector<float> X_train;
+        vector<float> y_train;
 
     public:
-        linearRegression(float p = 0.1){
-            this->p = p;
-        }
-
+        linearRegression(){}
         ~linearRegression() {};
 
-        void fit(vector<vector<float>> X_train, vector<vector<float>> y_train);
+        void fit(vector<float> X_train, vector<float> y_train, int numRows, int numCols, float p, int epochs);
         float predict(vector<float> row);        
 };
 
