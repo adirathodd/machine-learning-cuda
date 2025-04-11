@@ -27,12 +27,12 @@ void linearRegression::fit(vector<float> X_train, vector<float> y_train, int num
     int numBatches = numRows / k;
     if (numRows % k != 0) numBatches++;
 
-    CUDA_CHECK(((void**)&d_X_train, numRows * numCols * sizeof(float)));
-    CUDA_CHECK(((void**)&d_y_train, numRows * sizeof(float)));
-    CUDA_CHECK(((void**)&d_weights, numCols * sizeof(float)));
-    CUDA_CHECK((d_X_train, X_train.data(), numRows * numCols * sizeof(float), cudaMemcpyHostToDevice));
-    CUDA_CHECK((d_y_train, y_train.data(), numRows * sizeof(float), cudaMemcpyHostToDevice));
-    CUDA_CHECK((d_weights, weights, numCols * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc((void**)&d_X_train, numRows * numCols * sizeof(float)));
+    CUDA_CHECK(cudaMalloc((void**)&d_y_train, numRows * sizeof(float)));
+    CUDA_CHECK(cudaMalloc((void**)&d_weights, numCols * sizeof(float)));
+    CUDA_CHECK(cudaMemcpy(d_X_train, X_train.data(), numRows * numCols * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_y_train, y_train.data(), numRows * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_weights, weights, numCols * sizeof(float), cudaMemcpyHostToDevice));
 
     float g[numCols];
 
@@ -57,7 +57,7 @@ void linearRegression::fit(vector<float> X_train, vector<float> y_train, int num
 
             //update weights
             for(int i = 0; i < numCols; i++) this->weights[i] = this->weights[i] - (this->p * g[i]);
-            CUDA_CHECK((d_weights, weights, numCols * sizeof(float), cudaMemcpyHostToDevice));
+            CUDA_CHECK(cudaMemcpy(d_weights, weights, numCols * sizeof(float), cudaMemcpyHostToDevice));
 
         }
         
@@ -81,7 +81,7 @@ float linearRegression::predict(vector<float> row) {
 
 float linearRegression::compute_g0(int numCols, int t, int k, float *d_X_train, float *d_y_train, float *d_weights) {
     float *d_g0;
-    CUDA_CHECK(((void**)&d_g0, k * sizeof(float)));
+    CUDA_CHECK(cudaMalloc((void**)&d_g0, k * sizeof(float)));
 
     int threadsPerBlock = 32;
     int blocksPerGrid = (k + threadsPerBlock - 1) / threadsPerBlock;
@@ -149,7 +149,7 @@ float linearRegression::compute_gi(int numCols, int i, int t, int k, float *d_X_
     float h_g_i;
     CUDA_CHECK(cudaMemcpy(&h_g_i, d_partialSums, sizeof(float), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaFree(d_g_i));
-    CUDA_CHEK(cudaFree(d_partialSums));
+    CUDA_CHECK(cudaFree(d_partialSums));
 
     return h_g_i;
 }
