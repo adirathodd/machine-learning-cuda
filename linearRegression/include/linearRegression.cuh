@@ -18,7 +18,7 @@ class linearRegression {
     
     protected:
         float compute_g0(int numCols, int t, int k, float *d_X_train, float *d_y_train, float *d_weights);
-        float compute_gi(int numCols, int numRows, int i,int t, int k, float *d_X_train, float *d_y_train, float *d_weights);
+        float compute_gi(int numCols, int i, int t, int k, float *d_X_train, float *d_y_train, float *d_weights);
 
     public:
         linearRegression(){}

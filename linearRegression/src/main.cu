@@ -16,24 +16,31 @@ int main(){
     int numFeatures = numCols - 1;
 
     //scale the features
-    float attribute_means[numFeatures], attribute_deviations[numFeatures];
-    for(int i = 0; i < numRows; i++)
-        for(int j = 0; j < numFeatures; j++)
-            attribute_means[j] += data[i * numCols + j];
-    
-    for(int i = 0; i < numFeatures; i++) attribute_means[i] /= numRows;
+    std::vector<float> attribute_means[numFeatures] = {0};
+    std::vector<float> attribute_deviations[numFeatures] = {0};
 
-    for(int i = 0; i < numRows; i++)
-        for(int j = 0; j < numFeatures; j++)
+    for (int i = 0; i < numRows; i++)
+        for (int j = 0; j < numFeatures; j++)
+            attribute_means[j] += data[i * numCols + j];
+
+    for (int j = 0; j < numFeatures; j++)
+        attribute_means[j] /= numRows;
+
+    for (int i = 0; i < numRows; i++)
+        for (int j = 0; j < numFeatures; j++)
             attribute_deviations[j] += powf(data[i * numCols + j] - attribute_means[j], 2);
-    
-    for(int i = 0; i < numFeatures; i++) attribute_deviations[i] = sqrt(attribute_deviations[i] / numRows);
-    
+
+    for (int j = 0; j < numFeatures; j++) {
+        attribute_deviations[j] = sqrt(attribute_deviations[j] / numRows);
+        if (attribute_deviations[j] == 0.0f)
+            attribute_deviations[j] = 1.0f;
+    }
+
     float *scaled_features = (float *)malloc(sizeof(float) * numRows * numFeatures);
-    for(int i = 0; i < numRows; i++)
-        for(int j = 0; j < numFeatures; j++)
-            scaled_features[i * numFeatures + j] = (data[i * numCols + j] - attribute_means[j]) / attribute_deviations[j];
-            
+    for (int i = 0; i < numRows; i++)
+        for (int j = 0; j < numFeatures; j++)
+            scaled_features[i * numFeatures + j] =
+                (data[i * numCols + j] - attribute_means[j]) / attribute_deviations[j];
             
     // Create and shuffle row indices
     std::vector<int> indices(numRows);
