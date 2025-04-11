@@ -6,5 +6,6 @@
 
 __global__ void computeG0(int numFeatures, int t, int k, float bias, float *X_train, float *y_train, float *weights, float *g_0);
 __global__ void reduceSum(const float* input, float* output, int N);
+__global__ void computeGi(int numCols, int numRows, int i, int t, int k, float bias, float *X_train, float *y_train, float *weights, float *g_i);
 
 #endif

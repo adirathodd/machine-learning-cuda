@@ -13,7 +13,28 @@
 int main(){
     int numRows, numCols;
     float *data = loadCSV("data/student_performance.csv", &numRows, &numCols);
+    int numFeatures = numCols - 1;
 
+    //scale the features
+    float attribute_means[numFeatures], attribute_deviations[numFeatures];
+    for(int i = 0; i < numRows; i++)
+        for(int j = 0; j < numFeatures; j++)
+            attribute_means[j] += data[i * numCols + j];
+    
+    for(int i = 0; i < numFeatures; i++) attribute_means[i] /= numRows;
+
+    for(int i = 0; i < numRows; i++)
+        for(int j = 0; j < numFeatures; j++)
+            attribute_deviations[j] += powf(data[i * numCols + j] - attribute_means[j], 2);
+    
+    for(int i = 0; i < numFeatures; i++) attribute_deviations[i] = sqrt(attribute_deviations[i] / numRows);
+    
+    float *scaled_features = (float *)malloc(sizeof(float) * numRows * numFeatures);
+    for(int i = 0; i < numRows; i++)
+        for(int j = 0; j < numFeatures; j++)
+            scaled_features[i * numFeatures + j] = (data[i * numCols + j] - attribute_means[j]) / attribute_deviations[j];
+            
+            
     // Create and shuffle row indices
     std::vector<int> indices(numRows);
     for (int i = 0; i < numRows; i++){
@@ -25,31 +46,39 @@ int main(){
     int trainRows = static_cast<int>(numRows * 0.8);
     int testRows = numRows - trainRows;
 
-    std::vector<float> X_train(trainRows * (numCols - 1));
+    std::vector<float> X_train(trainRows * numFeatures);
     std::vector<float> y_train(trainRows);
-    std::vector<float> X_test(testRows * (numCols - 1));
+    std::vector<float> X_test(testRows * numFeatures);
     std::vector<float> y_test(testRows);
 
     for (int i = 0; i < trainRows; i++){
         int idx = indices[i];
-        std::memcpy(&X_train[i * (numCols - 1)],
-                    &data[idx * numCols],
-                    (numCols - 1) * sizeof(float));
-        y_train[i] = data[idx * numCols + (numCols - 1)];
+        std::memcpy(&X_train[i * numFeatures],
+                    &scaled_features[idx * numFeatures],
+                    (numFeatures) * sizeof(float));
+        y_train[i] = data[idx * numCols + numFeatures];
     }
 
 
     for (int i = trainRows; i < numRows; i++){
         int idx = indices[i];
         int testIndex = i - trainRows;
-        std::memcpy(&X_test[testIndex * (numCols - 1)],
-                    &data[idx * numCols],
-                    (numCols - 1) * sizeof(float));
-        y_test[testIndex] = data[idx * numCols + (numCols - 1)];
+        std::memcpy(&X_test[testIndex * numFeatures],
+                    &scaled_features[idx * numFeatures],
+                    (numFeatures) * sizeof(float));
+        y_test[testIndex] = data[idx * numCols + numFeatures];
     }
 
     delete[] data;
 
+    // for(int i = 0; i < 5; i++){
+    //     printf("Row %d: ", i);
+    //     for(int j = 0; j < numCols; j++){
+    //         printf("%f ", scaled_features[i * (numFeatures) + j]);
+    //     }
+    //     printf("\n");
+    // }
+
     linearRegression lr;
-    lr.fit(X_train, y_train, trainRows, numCols - 1, 0.01f, 100);
+    lr.fit(X_train, y_train, trainRows, numCols - 1, 0.001, 10);
 }

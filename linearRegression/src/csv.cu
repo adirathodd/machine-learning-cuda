@@ -51,10 +51,10 @@ float *loadCSV(const char *filename, int *numRows, int *numCols) {
 			else label = 0;
 
 			data[row * cols + col] = label;
-			break;
+		} else  {
+			data[row * cols + col] = atof(token);
 		}
-		
-		data[row * cols + col] = atof(token);
+
 		token = strtok(NULL, ",");
 		col++;
 	}

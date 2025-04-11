@@ -1,21 +1,37 @@
 #include <lr_kernels.cuh>
+#include <stdio.h>
 
 __global__ void computeG0(int numFeatures, int t, int k, float bias, float *X_train, float *y_train, float *weights, float *g_0) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int end = t * k, start = (t-1) * (k + 1);
-    if (idx < start || idx >= end) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int end = t * (k + 1), start = t * k;
+    
+    if(j < start || j >= end) return;
+
+    float dot = 0.0f;
+    for (int i = 0; i < numFeatures; i++) {
+        dot += X_train[j * numFeatures + i] * weights[i];
+    }
+
+    float curr_g0 = bias + dot - y_train[j];
+
+    g_0[j - start] = curr_g0;
+}
+
+__global__ void computeGi(int numCols, int numRows, int i, int t, int k, float bias, float *X_train, float *y_train, float *weights, float *g_i) {
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int end = t * (k+1), start = t * k;
+    if (j < start || j >= end) {
         return;
     }
 
     float dot = 0.0f;
-    for (int i = 0; i < numFeatures; i++) {
-        dot += X_train[idx * numFeatures + i] * weights[i];
+    for (int f = 0; f < numCols; f++) {
+        dot += X_train[j * numCols + f] * weights[f];
     }
-    dot += bias;
-    float curr_g0 = dot - y_train[idx];
 
-    g_0[idx - start] = curr_g0;
-    
+    float curr_gi = (bias + dot - y_train[j]) * X_train[j * numCols + i];
+
+    g_i[j - start] = curr_gi;
 }
 
 __global__ void reduceSum(const float* input, float* output, int N) {
