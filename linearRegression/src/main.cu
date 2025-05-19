@@ -2,13 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include <lr_kernels.cuh>
 #include <algorithm>
 #include <random>
 #include <cstring>
 #include <iostream>
-#include <cuda_runtime.h>
 #include <linearRegression.cuh>
+#include <lr_kernels.cuh>
 
 int main(){
     int numRows, numCols;
