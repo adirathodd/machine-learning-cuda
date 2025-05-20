@@ -2,8 +2,8 @@
 #include <stdio.h>
 
 __global__ void computeG0(int numFeatures, int t, int k, float bias, 
-    const float *__restrict__ X_train, const float *__restrict__ y_train, 
-    const float *__restrict__ weights, float *g_0) {
+     float * X_train,  float * y_train, 
+     float * weights, float *g_0) {
     // Compute the global index
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     // Compute start and end indices for the current mini-batch
@@ -24,8 +24,8 @@ __global__ void computeG0(int numFeatures, int t, int k, float bias,
 }
 
 __global__ void computeGi(int numCols, int i, int t, int k, float bias, 
-    const float *__restrict__ X_train, const float *__restrict__ y_train, 
-    const float *__restrict__ weights, float *g_i) {
+     float * X_train, float * y_train, 
+     float * weights, float *g_i) {
     // Compute the global index for the current batch element
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     int start = t * k;
@@ -46,7 +46,7 @@ __global__ void computeGi(int numCols, int i, int t, int k, float bias,
     g_i[j - start] = curr_gi;
 }
 
-__global__ void reduceSum(const float* input, float* output, int N) {
+__global__ void reduceSum( float* input, float* output, int N) {
     // Shared memory for partial sums
     extern __shared__ float sdata[];
 

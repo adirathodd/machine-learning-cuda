@@ -49,7 +49,7 @@ void linearRegression::fit(vector<float> X_train, vector<float> y_train, int num
 
             //compute loss for each feature
             for(int i = 0; i < numCols; i++){
-                g[i] = compute_gi(numCols, numRows, i, t, k, d_X_train, d_y_train, d_weights);
+                g[i] = compute_gi(numCols, i, t, k, d_X_train, d_y_train, d_weights);
             }
 
             //update bias
