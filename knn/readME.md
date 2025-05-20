@@ -1,10 +1,18 @@
-This project implements a K-Nearest Neighbors (KNN) classifier from scratch, integrating CUDA for parallel distance computation and leveraging the Thrust library for efficient sorting. It demonstrates the core principles of supervised learning through:
+# K-Nearest Neighbors (KNN) Classifier
 
-- **CSV Data Handling:** Reading and parsing datasets.
-- **Data Shuffling & Splitting:** Randomly shuffling data with a fixed seed for reproducibility and splitting it into training and testing sets.
-- **CUDA Acceleration:** Computing distances in parallel using CUDA kernels.
-- **Prediction:** Predicting labels based on the k nearest neighbors using majority voting with tie-breaking based on minimum distance.
+This module implements a K-Nearest Neighbors classifier from scratch in C++ and accelerates distance computations using NVIDIA CUDA. It processes CSV datasets, splits them into training and test sets, and performs predictions with majority voting and distance-based tie-breaking.
 
-Below is a visualization of the algorithm’s performance on different values of k:
+## Features
+
+- CSV data loading and preprocessing
+- Reproducible train/test split with fixed random seed
+- GPU-accelerated distance calculations via CUDA kernels
+- Efficient neighbor sorting using Thrust
+
+## Dataset
+
+This module includes the Iris dataset for classification experiments. The dataset contains 150 samples with four features (sepal length, sepal width, petal length, petal width) across three classes (setosa, versicolor, virginica). Use the provided `iris.data` file in the `data/` directory.
+
+## Results
 
 ![KNN Results](knn.png)

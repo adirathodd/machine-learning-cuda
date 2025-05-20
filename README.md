@@ -1,9 +1,16 @@
-# Intro to Machine Learning
+# Machine Learning Algorithms from Scratch with CUDA
 
-## Overview
-In this repository, I will implement and experiment with fundamental machine learning algorithms. My goal is to deepen my understanding of these techniques while showcasing my skills in parallel computing using CUDA C and C++.
+This repository contains implementations of fundamental machine learning algorithms written from scratch in C++ and parallelized using NVIDIA CUDA. The goal is to deepen understanding of machine learning techniques and GPU programming.
 
-## Projects
+## Features
 
-### K-Nearest Neighbors (KNN)
-### Linear Regression
+- Pure C++ implementations without external machine learning libraries
+- GPU-accelerated algorithms with CUDA kernels
+
+## Algorithms
+
+| Algorithm                | Description                                     | Status   |
+| ------------------------ | ----------------------------------------------- | -------- |
+| K-Nearest Neighbors      | Classifies samples in the Iris dataset using feature distance      | ✓        |
+| Linear Regression        | Predicts student exam scores using the Gaggle dataset via least squares | ✓        |
+| *More to come*           | *E.g., Logistic Regression, Decision Trees*     | Planned  |
