@@ -12,5 +12,5 @@ This repository contains implementations of fundamental machine learning algorit
 | Algorithm                | Description                                     | Status   |
 | ------------------------ | ----------------------------------------------- | -------- |
 | K-Nearest Neighbors      | Classifies samples in the Iris dataset using feature distance      | ✓        |
-| Linear Regression        | Predicts student exam scores using the Gaggle dataset via least squares | ✓        |
+| Multiple Linear Regression        | Predicts student exam scores using the Gaggle dataset via least squares | ✓        |
 | *More to come*           | *E.g., Logistic Regression, Decision Trees*     | Planned  |
