@@ -66,11 +66,43 @@ void split_data(const float* data,
 }
 
 
-int main(){
+int main(int argc, char *argv[]){
+
+    if(argc != 2){
+        printf("Usage - %s <nepochs>\n", argv[0]);
+        return -1;
+    }
+
 	int numRows, numCols;
 	float *data = loadCSV("data/student_performance.csv", &numRows, &numCols);
-	int numFeatures = numCols - 1, epochs = 10;
-	float train = 0.8,  p = 0.001;
+
+    // standardize features
+
+    const int cols_to_std[] = {0, 1, 3, 4};
+    const int n_std_cols = 4;
+
+    for(int c=0; c < n_std_cols; ++c){
+        int col = cols_to_std[c];
+
+        double sum = 0.0;
+        for(int i = 0; i < numRows; ++i) sum += data[i * numCols + col];
+        double mean = sum / numRows;
+
+        double sq_sum = 0.0, v;
+        for(int i = 0; i < numRows; i++){
+            v = data[i * numCols + col] - mean;
+            sq_sum += v * v;
+        }
+        double stddev = std::sqrt(sq_sum / numRows);
+        if(stddev == 0.0) stddev = 1.0;
+
+        for(int i = 0; i < numRows; ++i){
+            data[i * numCols + col] = static_cast<float>((data[i * numCols + col] - mean) / stddev);
+        }
+    }
+
+	int numFeatures = numCols - 1, epochs = strtol(argv[1], NULL, 10);
+	float train = 0.8,  p = 0.00001;
 
 	int train_N = numRows * train;
     int test_N = numRows - train_N;
@@ -81,4 +113,13 @@ int main(){
 
 	linearRegression lr;
 	lr.fit(X_train, y_train, train_N, numFeatures, p, epochs);
+
+    float mse = 0.0f;
+    float *preds = lr.predict(X_test, y_test, test_N, numFeatures, &mse);
+
+    for(int i = 0; i < 10; i++){
+        printf("Real - %f, Pred - %f\n", y_test[i], preds[i]);
+    }
+
+    printf("MSE - %f\n", mse);
 }

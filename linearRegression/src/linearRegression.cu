@@ -1,9 +1,8 @@
 #include <linearRegression.cuh>
 #include <random>
-#include <cuda_runtime.h>
 #include <lr_kernels.cuh>
-#include <cstdio>
-#include <cstdlib>
+#include <cub/cub.cuh>
+
 #define CUDA_CHECK(call) do {                                  \
     cudaError_t err = call;                                    \
     if (err != cudaSuccess) {                                  \
@@ -13,143 +12,142 @@
     }                                                          \
 } while(0)
 
-void linearRegression::fit(vector<float> X_train, vector<float> y_train, int numRows, int numCols, float p, int epochs) {
+void linearRegression::fit(float *X_train, float *y_train, int N, int d, float p, int epochs) {
     this->X_train = X_train, this->y_train = y_train, this->p = p;
-    float *d_X_train, *d_y_train, *d_weights;
+    this->N = N, this->d = d;
+    float *g = (float *)calloc(sizeof(float), d); // gradients
 
-    // initialize weights and bias
-    std::mt19937 rng(42);
-    this->bias = std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng);
-    this->weights = new float[numCols];
-    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+    this->weights = (float *)malloc(sizeof(float) * d);
+    std::mt19937 rng(std::random_device{}());
+    std::normal_distribution<float> dist(0.0f, 1.0f/std::sqrt(d));
+    bias = dist(rng);
+    for(int i = 0; i < d; ++i)
+        weights[i] = dist(rng);
+
+    cudaMalloc(&d_X, sizeof(float) * N * d);
+    cudaMalloc(&d_y, sizeof(float) * N);
+    cudaMalloc(&d_w, sizeof(float) * d);
+    cudaMemcpy(d_X, X_train, sizeof(float) * N * d, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y_train, sizeof(float) * N, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_w, weights, sizeof(float) * d, cudaMemcpyHostToDevice);
+
+    int e, i;
+
+    for(e = 1; e <= epochs; e++){
+        float g0 = compute_g(g);
+        this->bias -= this->p * g0;
+        
+        #pragma unroll 5
+        for(i = 0; i < d; i++) weights[i] -= p * g[i];
+        cudaMemcpy(d_w, weights, sizeof(float) * d, cudaMemcpyHostToDevice);
+
+        // if (e % 100 == 0) {
+        //     printf("Epoch - %d\n", e);
+
+        //     for(i = 0; i < d; i++) printf("weight[%d]=%f\n", i, weights[i]);
+        //     printf("bias=%f\n\n", bias);
+        // }
+    }
+
+    cudaFree(d_X);
+    cudaFree(d_y);
+    cudaFree(d_w);
+
+    printf("\nFinal Weights and Bias:\n");
+    printf("Bias - %f\n", bias);
+    for(i = 0; i < d; i++) printf("Weight[%d]=%f\n", i + 1, weights[i]);
+    printf("\n");
+}
+
+float *linearRegression::predict(float *X_test, float *y_test, int N, int d, float *MSE){
+    float *preds = (float *)malloc(sizeof(float) * N);
+
+    float *d_mse_r, *d_preds;
+    cudaMalloc(&d_mse_r, sizeof(float) * N);
+    cudaMalloc(&d_preds, sizeof(float) * N);
+
+    int threads = 256;
+    int blocks = (N + threads - 1) / threads;
+
+    cudaMalloc(&d_X, sizeof(float) * N * d);
+    cudaMalloc(&d_y, sizeof(float) * N);
+    cudaMalloc(&d_w, sizeof(float) * d);
+    cudaMemcpy(d_X, X_test, sizeof(float) * N * d, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y_test, sizeof(float) * N, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_w, weights, sizeof(float) * d, cudaMemcpyHostToDevice);
+
+    predict_kernel<<<blocks, threads>>>(d_X, d_y, d_w, d_preds, d_mse_r, N, d, bias);
+
+    cudaDeviceSynchronize();
+
+    // compute mse
+    float *d_mse = nullptr;
+    cudaMalloc(&d_mse, sizeof(float));
+
+    void * tmp = nullptr;
+    size_t tmp_bytes = 0;
+
+    cub::DeviceReduce::Sum(tmp,tmp_bytes, d_mse_r, d_mse, N);
+
+    cudaMalloc(&tmp, tmp_bytes);
+    cub::DeviceReduce::Sum(tmp, tmp_bytes, d_mse_r, d_mse, N);
+
+    cudaFree(tmp);
+    cudaMemcpy(MSE, d_mse, sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaMemcpy(preds, d_preds, sizeof(float) * N, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_X);
+    cudaFree(d_y);
+    cudaFree(d_w);
+    cudaFree(d_mse_r);
+    cudaFree(d_preds);
+    cudaFree(d_mse);
+
+    *MSE /= N;
+
+    return preds;
+}
+
+float linearRegression::compute_g(float *g_array){
+    float *d_residuals = nullptr;
+    cudaMalloc(&d_residuals, N * sizeof(float));
+
+    // compute g0
+    int threads = 256;
+    int blocks = (N + threads - 1) / threads;
+    compute_residuals<<<blocks, threads>>>(d_X, d_y, d_w, d_residuals, bias, N, d);
+
+    cudaDeviceSynchronize();
+
+    // sum reduction
+    float *d_g0 = nullptr;
+    cudaMalloc(&d_g0, sizeof(float));
+
+    void * tmp = nullptr;
+    size_t tmp_bytes = 0;
+
+    cub::DeviceReduce::Sum(tmp,tmp_bytes, d_residuals, d_g0, N);
+
+    cudaMalloc(&tmp, tmp_bytes);
+    cub::DeviceReduce::Sum(tmp, tmp_bytes, d_residuals, d_g0, N);
+
+    cudaFree(tmp);
     
-    int k = 100;
-    int numBatches = numRows / k;
-    if (numRows % k != 0) numBatches++;
+    float g0 = 0.0f;
+    cudaMemcpy(&g0, d_g0, sizeof(float), cudaMemcpyDeviceToHost);
+    // compute rest of gradients
+    blocks = d;
+    size_t shmem = sizeof(float) * threads;
+    float *d_g;
+    cudaMalloc(&d_g, sizeof(float) * N);
 
-    CUDA_CHECK(cudaMalloc((void**)&d_X_train, numRows * numCols * sizeof(float)));
-    CUDA_CHECK(cudaMalloc((void**)&d_y_train, numRows * sizeof(float)));
-    CUDA_CHECK(cudaMalloc((void**)&d_weights, numCols * sizeof(float)));
-    CUDA_CHECK(cudaMemcpy(d_X_train, X_train.data(), numRows * numCols * sizeof(float), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_y_train, y_train.data(), numRows * sizeof(float), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_weights, weights, numCols * sizeof(float), cudaMemcpyHostToDevice));
+    compute_g_kernel<<<blocks, threads, shmem>>>(d_X, d_residuals, d_g, N, d);
+    cudaDeviceSynchronize();
+    cudaMemcpy(g_array, d_g, sizeof(float) * d, cudaMemcpyDeviceToHost);
 
-    float g[numCols];
+    cudaFree(d_residuals);
+    cudaFree(d_g0);
 
-    for(int e = 0; e < epochs; e++) {
-
-        for (int i = 0; i < numCols; i++) {
-            printf("Weight %d: %f\n", i+1, weights[i]);
-        }
-        printf("-------------------------------------\n\n");
-        
-        for(int t = 0; t < numBatches; t++) {
-            // compute g_0
-            float g_0 = compute_g0(numCols, t, k, d_X_train, d_y_train, d_weights);
-
-            //compute loss for each feature
-            for(int i = 0; i < numCols; i++){
-                g[i] = compute_gi(numCols, i, t, k, d_X_train, d_y_train, d_weights);
-            }
-
-            //update bias
-            this->bias = this->bias - (this->p * g_0);
-
-            //update weights
-            for(int i = 0; i < numCols; i++) this->weights[i] = this->weights[i] - (this->p * g[i]);
-            CUDA_CHECK(cudaMemcpy(d_weights, weights, numCols * sizeof(float), cudaMemcpyHostToDevice));
-
-        }
-        
-    }
-
-    printf("Final Bias: %f\n", bias);
-    for (int i = 0; i < numCols; i++) {
-        printf("Final Weight %d: %f\n", i+1, weights[i]);
-    }
-
-    return;
-}
-
-float linearRegression::predict(vector<float> row) {
-    float prediction = 0.0f;
-    for (int i = 0; i < row.size(); i++) {
-        prediction += row[i] * weights[i];
-    }
-    return prediction;
-}
-
-float linearRegression::compute_g0(int numCols, int t, int k, float *d_X_train, float *d_y_train, float *d_weights) {
-    float *d_g0;
-    CUDA_CHECK(cudaMalloc((void**)&d_g0, k * sizeof(float)));
-
-    int threadsPerBlock = 32;
-    int blocksPerGrid = (k + threadsPerBlock - 1) / threadsPerBlock;
-    computeG0<<<blocksPerGrid, threadsPerBlock>>>(numCols, t, k, bias,
-                                                d_X_train, d_y_train, d_weights, d_g0);
-
-    CUDA_CHECK(cudaDeviceSynchronize());
-
-    int reduceThreads = 32;
-    int reduceBlocks = (k + reduceThreads * 2 - 1) / (reduceThreads * 2);
-    size_t sharedMemSize = reduceThreads * sizeof(float);
-    float *d_partialSums;
-    CUDA_CHECK(cudaMalloc((void**)&d_partialSums, reduceBlocks * sizeof(float)));
-
-    reduceSum<<<reduceBlocks, reduceThreads, sharedMemSize>>>(d_g0, d_partialSums, k);
-    CUDA_CHECK(cudaDeviceSynchronize());
-
-    int s = reduceBlocks;
-    while (s > 1) {
-        int threads = (s < reduceThreads * 2 ? s / 2 : reduceThreads);
-        int blocks = (s + threads * 2 - 1) / (threads * 2);
-        reduceSum<<<blocks, threads, threads * sizeof(float)>>>(d_partialSums, d_partialSums, s);
-        CUDA_CHECK(cudaDeviceSynchronize());
-        s = blocks;
-    }
-
-    float h_g0;
-    CUDA_CHECK(cudaMemcpy(&h_g0, d_partialSums, sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaFree(d_g0));
-    CUDA_CHECK(cudaFree(d_partialSums));
-
-    return h_g0;
-}
-
-float linearRegression::compute_gi(int numCols, int i, int t, int k, float *d_X_train, float *d_y_train, float *d_weights) {
-    float *d_g_i;
-    CUDA_CHECK(cudaMalloc((void**)&d_g_i, k * sizeof(float)));
-
-    int threadsPerBlock = 256;
-    int blocksPerGrid = (k + threadsPerBlock - 1) / threadsPerBlock;
-
-    // d_g_i[j] = (bias + dot(X[j], w) - y[j]) * X[j * numCols + i]
-    computeGi<<<blocksPerGrid, threadsPerBlock>>>(numCols, i, t, k, bias,
-                    d_X_train, d_y_train, d_weights, d_g_i);
-    CUDA_CHECK(cudaDeviceSynchronize());
-
-    int reduceThreads = 256;
-    int reduceBlocks = (k + reduceThreads * 2 - 1) / (reduceThreads * 2);
-    size_t sharedMemSize = reduceThreads * sizeof(float);
-    float *d_partialSums;
-    CUDA_CHECK(cudaMalloc((void**)&d_partialSums, reduceBlocks * sizeof(float)));
-
-    reduceSum<<<reduceBlocks, reduceThreads, sharedMemSize>>>(d_g_i, d_partialSums, k);
-    CUDA_CHECK(cudaDeviceSynchronize());
-
-    int s = reduceBlocks;
-    while (s > 1) {
-        int threads = (s < reduceThreads * 2 ? s / 2 : reduceThreads);
-        int blocks = (s + threads * 2 - 1) / (threads * 2);
-        reduceSum<<<blocks, threads, threads * sizeof(float)>>>(d_partialSums, d_partialSums, s);
-        CUDA_CHECK(cudaDeviceSynchronize());
-        s = blocks;
-    }
-
-    float h_g_i;
-    CUDA_CHECK(cudaMemcpy(&h_g_i, d_partialSums, sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaFree(d_g_i));
-    CUDA_CHECK(cudaFree(d_partialSums));
-
-    return h_g_i;
+    return g0;
 }

@@ -1,74 +1,74 @@
 #include <lr_kernels.cuh>
 #include <stdio.h>
 
-__global__ void computeG0(int numFeatures, int t, int k, float bias, 
-     float * X_train,  float * y_train, 
-     float * weights, float *g_0) {
-    // Compute the global index
-    int j = blockIdx.x * blockDim.x + threadIdx.x;
-    // Compute start and end indices for the current mini-batch
-    int start = t * k; 
-    int end = t * (k + 1);  // If each batch has exactly k elements, consider setting end = start + k
-    
-    if(j < start || j >= end) return;
-    
-    float dot = 0.0f;
-    // Compute dot product for training example j
-    for (int i = 0; i < numFeatures; i++) {
-        dot += X_train[j * numFeatures + i] * weights[i];
+__global__
+void compute_residuals(
+    const float * __restrict__ X,
+    const float * __restrict__ y,
+    const float * __restrict__ w,
+    float * __restrict__ res, // [N]
+    float b, int N, int d
+){
+    int j = blockDim.x * blockIdx.x + threadIdx.x;
+    if(j >= N) return;
+
+    // dot product X[j] * w
+    const float *xj = X + j * d;
+    float pred = b;
+
+    for(int i = 0; i < d; ++i){
+        pred += w[i] * xj[i];
     }
-    
-    float curr_g0 = bias + dot - y_train[j];
-    // Store the gradient output, offset by the start index
-    g_0[j - start] = curr_g0;
+
+    res[j] = pred - y[j];
+
 }
 
-__global__ void computeGi(int numCols, int i, int t, int k, float bias, 
-     float * X_train, float * y_train, 
-     float * weights, float *g_i) {
-    // Compute the global index for the current batch element
-    int j = blockIdx.x * blockDim.x + threadIdx.x;
-    int start = t * k;
-    int end = t * (k + 1);  // If each batch has exactly k elements, consider setting end = start + k
-    
-    if (j < start || j >= end) {
-        return;
-    }
-    
-    float dot = 0.0f;
-    // Compute dot product over all features for training example j
-    for (int f = 0; f < numCols; f++) {
-        dot += X_train[j * numCols + f] * weights[f];
-    }
-    
-    // Multiply the error by the i-th feature
-    float curr_gi = (bias + dot - y_train[j]) * X_train[j * numCols + i];
-    g_i[j - start] = curr_gi;
-}
-
-__global__ void reduceSum( float* input, float* output, int N) {
-    // Shared memory for partial sums
+__global__ void compute_g_kernel(
+    const float* __restrict__ X,    // [N×d]
+    const float* __restrict__ r,    // [N]   residuals
+          float*       grad,        // [d]   output gradients
+    int             N,
+    int             d
+) {
     extern __shared__ float sdata[];
-
-    unsigned int tid = threadIdx.x;
-    // Each block processes 2 * blockDim.x elements
-    unsigned int i = blockIdx.x * (blockDim.x * 2) + threadIdx.x;
+    int feat = blockIdx.x; // i
+    int thread = threadIdx.x;
     float sum = 0.0f;
-    if (i < N)
-        sum = input[i];
-    if (i + blockDim.x < N)
-        sum += input[i + blockDim.x];
-    sdata[tid] = sum;
+
+    for(int j = thread; j < N; j+=blockDim.x)
+        sum += r[j] * X[j * d + feat];
+
+    sdata[thread] = sum;
     __syncthreads();
 
-    // Binary tree reduction in shared memory
-    for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tid < s) {
-            sdata[tid] += sdata[tid + s];
-        }
-        __syncthreads();
+    // sum reduction for this thread (feature)
+    for(int stride = blockDim.x / 2; stride > 0; stride >>= 1){
+        if(thread < stride)
+            sdata[thread] += sdata[thread + stride];
+        
+            __syncthreads();
     }
 
-    if (tid == 0)
-        output[blockIdx.x] = sdata[0];
+    if (thread == 0) grad[feat] = sdata[0]; // update grad for this feature
+}
+
+__global__ void predict_kernel(
+    const float * __restrict__ X, // [Nxd]
+    const float * __restrict__ y, // [N]
+    const float * __restrict__ w, // [d]
+    float *preds, float *mse_r, // [N]
+    int N, int d, float bias
+){
+    int tid = blockDim.x * blockIdx.x + threadIdx.x; // j (row)
+
+    if (tid >= N) return;
+    
+    const float *Xj = X + tid * d;
+
+    preds[tid] = bias;
+
+    for(int i = 0; i < d; i++) preds[tid] += Xj[i] * w[i];
+
+    mse_r[tid] = powf(y[tid] - preds[tid], 2);
 }

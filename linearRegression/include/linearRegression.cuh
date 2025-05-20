@@ -12,18 +12,17 @@ using namespace std;
 class linearRegression {
 	private:
 		float p, bias;
-		float *weights; // Vector (d-dimensional)
-		float *X_train; // 2D Matrix (N x d)
-		float *y_train; // 2D Matrix (N x 1)
+		float *weights, *d_w; // Vector (d-dimensional)
+		float *X_train, *d_X; // 2D Matrix (N x d)
+		float *y_train, *d_y; // 2D Matrix (N x 1)
+		int N, d;
 	
 	protected:
-		float compute_g0();
-		float *compute_g();
-		void update_weights();
+		float compute_g(float *g_array);
 	
 	public:
 		void fit(float *X_train, float *y_train, int N, int d, float p, int epochs);
-		float *predict(float *X_test, float *y_test, int N, int d);
+		float *predict(float *X_test, float *y_test, int N, int d, float *mse);
 
 };
 
