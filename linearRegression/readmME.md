@@ -1,6 +1,6 @@
-# Multiple Linear Regression
+# Linear Regression
 
-This module implements a multiple linear regression model from scratch in C++ and accelerates matrix operations using NVIDIA CUDA. It processes CSV datasets, computes the normal equation for parameter estimation, and predicts continuous outcomes.
+This module implements a linear regression model from scratch in C++ and accelerates matrix operations using NVIDIA CUDA. It processes CSV datasets, computes the normal equation for parameter estimation, and predicts continuous outcomes.
 
 ## Features
 
