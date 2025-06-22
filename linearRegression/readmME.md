@@ -17,4 +17,4 @@ This module uses the Student Performance dataset from Kaggle: https://www.kaggle
 
 - Mean Squared Error (MSE) on test set: **4.079**
 
-![Linear Regression](mlr.png)
+![Linear Regression](lr.png)
